@@ -23,15 +23,16 @@ class Convergence:
         if self.criteria == 'disp':
             return self.disp_norm_criteria(*args)
 
-    def disp_norm_criteria(self, delta_u, u_trial):
+    def disp_norm_criteria(self, delta_u, u_trial, norm=np.inf):
         """
         Norm displacement increment convergence criteria
         :param delta_u: Displacement increment
         :param u_trial: Trial displacement
+        :param norm: Norm
         :return:
         """
-        delta_norm = np.linalg.norm(delta_u, ord=np.inf)
-        u_trial_norm = np.linalg.norm(u_trial, ord=np.inf)
+        delta_norm = np.linalg.norm(delta_u, ord=norm)
+        u_trial_norm = np.linalg.norm(u_trial, ord=norm)
         return delta_norm, u_trial_norm
 
     def unbalance_norm_criteria(self):
