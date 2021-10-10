@@ -41,6 +41,12 @@ class TRBDF2:
         self.b_5 = 1 / self.model.d_t
         self.dof_i, self.dof_j, self.dof = self.model.active_dof_i, self.model.active_dof_j, self.model.active_dof
 
+    def __call__(self, *args, **kwargs):
+        if len(self.model.c_ele.keys()) == 0:
+            self.solve_non_contact()
+        if len(self.model.c_ele.keys()) != 0:
+            self.solve_contact()
+
     def algorithm(self, tag):
         """
         Define algorithm tag
@@ -54,6 +60,9 @@ class TRBDF2:
         if tag == 'newton':
             from ileenet.algorithm.NewtonRaphson import NewtonRaphson
             self.algo = NewtonRaphson(prob_tag)
+        if tag == 'modified_newton':
+            from ileenet.algorithm.ModifiedNewton import ModifiedNewton
+            self.algo = ModifiedNewton(prob_tag)
 
     def test(self, tag, tol, num_iter):
         """
@@ -164,14 +173,18 @@ class TRBDF2:
         while True:
             l += 1
             self.model.update_g(u_trial, step)  # Update gap
-            self.model.update_kc(u_trial, step)  # Update contact element stiffness matrix
+            self.model.update_kc(step)  # Update contact element stiffness matrix
             self.model.assemble_kc()  # Assemble contact stiffness matrix
-            self.model.update_fc(u_trial, step)  # Assemble nodal contact force vector
+            self.model.update_fc(step)  # Assemble nodal contact force vector
             self.model.assemble_fc()  # Assemble nodal contact force vector
             kc = self.model.kc[self.dof_i, self.dof_j]  # Instant global contact stiffness matrix
-            # print(kc[0, 0])
+            print(kc[0, 0])
             fc = self.model.fc[self.dof]  # Instant contact force vector
-            k_hat = self.a_0 * m + self.a_1 * c + k + kc  # Instant equivalent stiffness matrix
+            if self.algo_tag == 'newton':
+                k_hat = self.a_0 * m + self.a_1 * c + k + kc  # Instant equivalent stiffness matrix
+            else:
+                # Initial equivalent stiffness matrix
+                k_hat = self.algo.get_init_k(self.model, self.a_0, self.a_1, step, m, c, k)
             u_trial_dof = u_trial[self.dof].reshape(-1, 1)  # Trial displacement at active dof
             u_trial_dof, delta_u = self.algo(u_trial_dof, k_hat, f, fc)  # Update trial displacement
             u_trial[self.dof] = u_trial_dof.reshape(-1)
@@ -202,21 +215,25 @@ class TRBDF2:
         while True:
             l += 1
             self.model.update_g(u_trial, step)  # Update gap
-            self.model.update_kc(u_trial, step)  # Update contact element stiffness matrix
+            self.model.update_kc(step)  # Update contact element stiffness matrix
             self.model.assemble_kc()  # Assemble contact stiffness matrix
-            self.model.update_fc(u_trial, step)  # Assemble nodal contact force vector
+            self.model.update_fc(step)  # Assemble nodal contact force vector
             self.model.assemble_fc()  # Assemble nodal contact force vector
             kc = self.model.kc[self.dof_i, self.dof_j]  # Instant global contact stiffness matrix
             print(kc[0, 0])
             fc = self.model.fc[self.dof]  # Instant contact force vector
-            k_hat = self.b_0 * m + self.b_1 * c + k + kc  # Instant equivalent stiffness matrix
+            if self.algo_tag == 'newton':
+                k_hat = self.b_0 * m + self.b_1 * c + k + kc  # Instant equivalent stiffness matrix
+            else:
+                # Initial equivalent stiffness matrix
+                k_hat = self.algo.get_init_k(self.model, self.b_0, self.b_1, step, m, c, k)
             u_trial_dof = u_trial[self.dof].reshape(-1, 1)  # Trial displacement at active dof
             u_trial_dof, delta_u = self.algo(u_trial_dof, k_hat, f, fc)  # Update trial displacement
             u_trial[self.dof] = u_trial_dof.reshape(-1)
             delta_norm, u_trial_norm = self.convergence(delta_u, u_trial_dof)
             if delta_norm < self.tol * u_trial_norm:
                 self.model.u[self.dof, step + 1] = u_trial_dof.reshape(-1)
-                self.model.update_g(self.model.u[:, step + 1], step)
+                self.model.update_g(self.model.u[:, step], step)
                 break
             if l > self.num_iter:
                 raise RuntimeError('Newton-Raphson iterations did not converge at the second sub-step!')
@@ -261,11 +278,11 @@ class TRBDF2:
         self.model.u_t[self.dof, :] = u_t
         self.model.u_tt[self.dof, :] = u_tt
 
-    def integrator(self):
-        """
-        TRBDF2 integral scheme
-        """
-        if len(self.model.c_ele.keys()) == 0:
-            self.solve_non_contact()
-        if len(self.model.c_ele.keys()) != 0:
-            self.solve_contact()
+    def solve_first_sub_step_contact_damping(self, step, m, c, k, u, f):
+        pass
+
+    def solve_second_sub_step_contact_damping(self, step, m, c, k, u, f):
+        pass
+
+    def solve_contact_damping(self):
+        pass

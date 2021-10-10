@@ -33,6 +33,15 @@ class Newmark:
         self.a_7 = gamma * self.model.d_t
         self.dof_i, self.dof_j, self.dof = self.model.active_dof_i, self.model.active_dof_j, self.model.active_dof
 
+    def __call__(self, *args, **kwargs):
+        if self.algo_tag == 'linear':
+            self.solve_linear()
+        else:
+            if len(self.model.c_ele.keys()) == 0:
+                self.solve_non_contact()
+            if len(self.model.c_ele.keys()) != 0:
+                self.solve_contact()
+
     def algorithm(self, tag):
         """
         Define algorithm tag
@@ -62,14 +71,14 @@ class Newmark:
         self.tol = tol
         self.num_iter = num_iter
 
-    def static(self):
+    def solve_static(self):
         """
-        Linear solver for static problems
+        Linear integrator for static problems
         """
         k_inv = np.linalg.inv(self.model.k[self.dof_i, self.dof_j])
         self.model.u[self.dof] = np.dot(k_inv, self.model.f[self.dof])
 
-    def linear(self):
+    def solve_linear(self):
         """
         Solve linear problem
         """
@@ -93,14 +102,11 @@ class Newmark:
         self.model.u_t[self.dof, :] = u_t
         self.model.u_tt[self.dof, :] = u_tt
 
-    def get_init_k(self, step, m, c, k):
-        u_trial = self.model.u[:, step]  # Initial trial displacement
-        self.model.update_g(u_trial, step)  # Update gap
-        self.model.update_kc(u_trial, step)  # Update contact element stiffness matrix
-        self.model.assemble_kc()  # Assemble contact stiffness matrix
-        kc = self.model.kc[self.dof_i, self.dof_j]  # Instant global contact stiffness matrix
-        k_0_hat = self.a_0 * m + self.a_1 * c + k + kc  # Instant equivalent stiffness matrix
-        return k_0_hat
+    def solve_time_step_contact_damping(self, step, m, c, k, f):
+        pass
+
+    def solve_contact_damping(self):
+        pass
 
     def solve_time_step_contact(self, step, m, c, k, f):
         """
@@ -116,24 +122,22 @@ class Newmark:
         while True:
             l += 1
             self.model.update_g(u_trial, step)  # Update gap
-            self.model.update_kc(u_trial, step)  # Update contact element stiffness matrix
+            self.model.update_kc(step)  # Update contact element stiffness matrix
             self.model.assemble_kc()  # Assemble contact stiffness matrix
-            self.model.update_fc(u_trial, step)  # Assemble nodal contact force vector
+            self.model.update_fc(step)  # Assemble nodal contact force vector
             self.model.assemble_fc()  # Assemble nodal contact force vector
             kc = self.model.kc[self.dof_i, self.dof_j]  # Instant global contact stiffness matrix
             print(kc[0, 0])
             fc = self.model.fc[self.dof]  # Instant contact force vector
-            k_hat = self.a_0 * m + self.a_1 * c + k + kc  # Instant equivalent stiffness matrix
-            u_trial_dof = u_trial[self.dof].reshape(-1, 1)  # Trial displacement at active dof
             if self.algo_tag == 'newton':
-                u_trial_dof, delta_u = self.algo(u_trial_dof, k_hat, f, fc)  # Update trial displacement
-            if self.algo_tag == 'modified_newton':
-                k_0 = self.get_init_k(0, m, c, k)
-                a = k_hat - k_0
-                u_trial_dof, delta_u = self.algo(u_trial_dof, k_0, f, fc)  # Update trial displacement
+                k_hat = self.a_0 * m + self.a_1 * c + k + kc  # Instant equivalent stiffness matrix
+            else:
+                # Initial equivalent stiffness matrix
+                k_hat = self.algo.get_init_k(self.model, self.a_0, self.a_1, step, m, c, k)
+            u_trial_dof = u_trial[self.dof].reshape(-1, 1)  # Trial displacement at active dof
+            u_trial_dof, delta_u = self.algo(u_trial_dof, k_hat, f, fc)  # Update trial displacement
             u_trial[self.dof] = u_trial_dof.reshape(-1)
             delta_norm, u_trial_norm = self.convergence(delta_u, u_trial_dof)
-            l += 1
             if delta_norm < self.tol * u_trial_norm:
                 self.model.u[self.dof, step + 1] = u_trial_dof.reshape(-1)
                 self.model.update_g(self.model.u[:, step + 1], step)
@@ -178,11 +182,11 @@ class Newmark:
         l = 0  # Iteration step
         u_trial = self.model.u[:, step]  # Initial trial displacement
         while True:
+            l += 1
             u_trial_dof = u_trial[self.dof].reshape(-1, 1)  # Trial displacement at active dof
             u_trial_dof, delta_u = self.algo(u_trial_dof, k, f)  # Update trial displacement
             u_trial[self.dof] = u_trial_dof.reshape(-1)
             delta_norm, u_trial_norm = self.convergence(delta_u, u_trial_dof)
-            l += 1
             if delta_norm < self.tol * u_trial_norm:
                 self.model.u[self.dof, step + 1] = u_trial_dof.reshape(-1)
                 break
@@ -212,14 +216,3 @@ class Newmark:
             u_t[:, step + 1] = u_t[:, step] + self.a_6 * u_tt[:, step] + self.a_7 * u_tt[:, step + 1]
         self.model.u_t[self.dof, :] = u_t
         self.model.u_tt[self.dof, :] = u_tt
-
-    def integrator(self):
-        """
-        Newmark integral scheme
-        """
-        if self.algo_tag == 'linear':
-            self.linear()
-        if self.algo_tag == 'newton' and len(self.model.c_ele.keys()) == 0:
-            self.solve_non_contact()
-        if self.algo_tag == 'modified_newton' and len(self.model.c_ele.keys()) != 0:
-            self.solve_contact()
