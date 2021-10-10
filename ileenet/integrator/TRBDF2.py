@@ -62,7 +62,7 @@ class TRBDF2:
         :param tol: Convergence tolerance
         :param num_iter: Maximum number of iterations
         """
-        from ileenet.algorithm.Convergence import Convergence
+        from ileenet.convergence.Convergence import Convergence
         self.convergence = Convergence(tag)
         self.tol = tol
         self.num_iter = num_iter
@@ -161,9 +161,9 @@ class TRBDF2:
         """
         l = 0  # Iteration step
         u_trial = self.model.u[:, step]  # Initial trial displacement
-        self.model.init_g()  # Initial gap
         while True:
             l += 1
+            self.model.update_g(u_trial, step)  # Update gap
             self.model.update_kc(u_trial, step)  # Update contact element stiffness matrix
             self.model.assemble_kc()  # Assemble contact stiffness matrix
             self.model.update_fc(u_trial, step)  # Assemble nodal contact force vector
@@ -180,7 +180,7 @@ class TRBDF2:
                 u[:, step + 1] = u_trial_dof.reshape(-1)
                 u_tmp = np.zeros_like(self.model.u[:, step])
                 u_tmp[self.dof] = u[:, step + 1]
-                self.model.update_g(u_tmp, step + 1)
+                self.model.update_g(u_tmp, step)
                 break
             if l > self.num_iter:
                 raise RuntimeError('Newton-Raphson iterations did not converge at the first sub-step!')
@@ -199,9 +199,9 @@ class TRBDF2:
         l = 0  # Iteration step
         u_trial = np.zeros_like(self.model.u[:, step])
         u_trial[self.dof] = u[:, step]  # Initial trial displacement
-        self.model.init_g()
         while True:
             l += 1
+            self.model.update_g(u_trial, step)  # Update gap
             self.model.update_kc(u_trial, step)  # Update contact element stiffness matrix
             self.model.assemble_kc()  # Assemble contact stiffness matrix
             self.model.update_fc(u_trial, step)  # Assemble nodal contact force vector
@@ -216,7 +216,7 @@ class TRBDF2:
             delta_norm, u_trial_norm = self.convergence(delta_u, u_trial_dof)
             if delta_norm < self.tol * u_trial_norm:
                 self.model.u[self.dof, step + 1] = u_trial_dof.reshape(-1)
-                self.model.update_g(self.model.u[:, step + 1], step + 1)
+                self.model.update_g(self.model.u[:, step + 1], step)
                 break
             if l > self.num_iter:
                 raise RuntimeError('Newton-Raphson iterations did not converge at the second sub-step!')
@@ -235,6 +235,7 @@ class TRBDF2:
         a_g = self.model.a_g[self.dof, :]  # Ground motion accelerations at nodes
         f = -np.dot(m, a_g) + self.model.f[self.dof, :]  # known equivalent nodal forces
         u_tt[:, 0] = np.dot(np.linalg.inv(m), f[:, 0] - np.dot(c, u_t[:, 0]) - np.dot(k, u[:, 0]))
+        self.model.init_g()  # Initial gap
         for step in range(self.model.accel_len - 1):
             print(step)
             f_hat_1 = 0.5 * (f[:, step] + f[:, step + 1]) + \

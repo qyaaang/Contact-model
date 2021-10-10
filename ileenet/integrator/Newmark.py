@@ -46,6 +46,9 @@ class Newmark:
         if tag == 'newton':
             from ileenet.algorithm.NewtonRaphson import NewtonRaphson
             self.algo = NewtonRaphson(prob_tag)
+        if tag == 'modified_newton':
+            from ileenet.algorithm.ModifiedNewton import ModifiedNewton
+            self.algo = ModifiedNewton(prob_tag)
 
     def test(self, tag, tol, num_iter):
         """
@@ -54,7 +57,7 @@ class Newmark:
         :param tol: Convergence tolerance
         :param num_iter: Maximum number of iterations
         """
-        from ileenet.algorithm.Convergence import Convergence
+        from ileenet.convergence.Convergence import Convergence
         self.convergence = Convergence(tag)
         self.tol = tol
         self.num_iter = num_iter
@@ -90,6 +93,15 @@ class Newmark:
         self.model.u_t[self.dof, :] = u_t
         self.model.u_tt[self.dof, :] = u_tt
 
+    def get_init_k(self, step, m, c, k):
+        u_trial = self.model.u[:, step]  # Initial trial displacement
+        self.model.update_g(u_trial, step)  # Update gap
+        self.model.update_kc(u_trial, step)  # Update contact element stiffness matrix
+        self.model.assemble_kc()  # Assemble contact stiffness matrix
+        kc = self.model.kc[self.dof_i, self.dof_j]  # Instant global contact stiffness matrix
+        k_0_hat = self.a_0 * m + self.a_1 * c + k + kc  # Instant equivalent stiffness matrix
+        return k_0_hat
+
     def solve_time_step_contact(self, step, m, c, k, f):
         """
         Solve time step for contact problem
@@ -100,10 +112,10 @@ class Newmark:
         :param f: External loads
         """
         l = 0  # Iteration step
-        u_trial = self.model.u[:, step]  # Initial trial displacement
-        self.model.init_g()  # Initial gap
+        u_trial = self.model.u[:, step] + 0.  # Initial trial displacement
         while True:
             l += 1
+            self.model.update_g(u_trial, step)  # Update gap
             self.model.update_kc(u_trial, step)  # Update contact element stiffness matrix
             self.model.assemble_kc()  # Assemble contact stiffness matrix
             self.model.update_fc(u_trial, step)  # Assemble nodal contact force vector
@@ -113,13 +125,18 @@ class Newmark:
             fc = self.model.fc[self.dof]  # Instant contact force vector
             k_hat = self.a_0 * m + self.a_1 * c + k + kc  # Instant equivalent stiffness matrix
             u_trial_dof = u_trial[self.dof].reshape(-1, 1)  # Trial displacement at active dof
-            u_trial_dof, delta_u = self.algo(u_trial_dof, k_hat, f, fc)  # Update trial displacement
+            if self.algo_tag == 'newton':
+                u_trial_dof, delta_u = self.algo(u_trial_dof, k_hat, f, fc)  # Update trial displacement
+            if self.algo_tag == 'modified_newton':
+                k_0 = self.get_init_k(0, m, c, k)
+                a = k_hat - k_0
+                u_trial_dof, delta_u = self.algo(u_trial_dof, k_0, f, fc)  # Update trial displacement
             u_trial[self.dof] = u_trial_dof.reshape(-1)
             delta_norm, u_trial_norm = self.convergence(delta_u, u_trial_dof)
             l += 1
             if delta_norm < self.tol * u_trial_norm:
                 self.model.u[self.dof, step + 1] = u_trial_dof.reshape(-1)
-                self.model.update_g(self.model.u[:, step + 1], step + 1)
+                self.model.update_g(self.model.u[:, step + 1], step)
                 break
             if l > self.num_iter:
                 raise RuntimeError('Newton-Raphson iterations did not converge!')
@@ -137,6 +154,7 @@ class Newmark:
         a_g = self.model.a_g[self.dof, :]  # Ground motion accelerations at nodes
         f = -np.dot(m, a_g) + self.model.f[self.dof, :]  # known equivalent nodal forces
         u_tt[:, 0] = np.dot(np.linalg.inv(m), f[:, 0] - np.dot(c, u_t[:, 0]) - np.dot(k, u[:, 0]))
+        self.model.init_g()  # Initial gap
         for step in range(self.model.accel_len - 1):
             print(step)
             f_hat = f[:, step + 1] + \
@@ -203,5 +221,5 @@ class Newmark:
             self.linear()
         if self.algo_tag == 'newton' and len(self.model.c_ele.keys()) == 0:
             self.solve_non_contact()
-        if self.algo_tag == 'newton' and len(self.model.c_ele.keys()) != 0:
+        if self.algo_tag == 'modified_newton' and len(self.model.c_ele.keys()) != 0:
             self.solve_contact()
