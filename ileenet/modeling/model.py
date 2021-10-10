@@ -100,9 +100,28 @@ class Model:
         if len(mass_values) != self.ndf:
             raise Exception('The length of nodal mass vectors must be equal to the ndf.')
 
-    def hertz_contact(self, mat_tag, g_p, k_c1, k_c2, c_c1, c_c2, mu, gap_tol):
+    def hertz_contact_1(self, mat_tag, g_p, k_c1, k_c2, c_c, mu, gap_tol):
         """
-        Create hertz contact modeling
+        Create hertz contact model
+        :param mat_tag: Material tag
+        :param g_p: Gap between nodes
+        :param k_c1: Contact stiffness before contact
+        :param k_c2: Contact stiffness after contact
+        :param c_c: Constant damping coefficient
+        :param mu: Friction coefficient
+        :param gap_tol: Gap tolerance
+        """
+        self.mat[str(mat_tag)] = {'gap': g_p,
+                                  'k_c1': k_c1,
+                                  'k_c2': k_c2,
+                                  'c_c': c_c,
+                                  'mu': mu,
+                                  'gap_tol': gap_tol
+                                  }
+
+    def hertz_contact_2(self, mat_tag, g_p, k_c1, k_c2, c_c1, c_c2, mu, gap_tol):
+        """
+        Create hertz contact model
         :param mat_tag: Material tag
         :param g_p: Gap between nodes
         :param k_c1: Contact stiffness before contact
@@ -117,15 +136,6 @@ class Model:
                                   'k_c2': k_c2,
                                   'c_c1': c_c1,
                                   'c_c2': c_c2,
-                                  'mu': mu,
-                                  'gap_tol': gap_tol
-                                  }
-
-    def hertz_contact_(self, mat_tag, g_p, k_c1, k_c2, c_c, mu, gap_tol):
-        self.mat[str(mat_tag)] = {'gap': g_p,
-                                  'k_c1': k_c1,
-                                  'k_c2': k_c2,
-                                  'c_c': c_c,
                                   'mu': mu,
                                   'gap_tol': gap_tol
                                   }
@@ -211,63 +221,59 @@ class Model:
             node_r = self.c_ele[ele]['node'][1]
             u_c = u[(node_c - 1) * 3]
             u_r = u[(node_r - 1) * 3]
+            g_0 = self.g[ele][0]
+            g_step_1 = u_r - u_c + g_0  # Trial gap at step + 1
             # print(u_c, u_r)
-            if step == 0:
-                g = self.g_0[ele]
-            else:
-                g = u_r - u_c + self.g[ele][step - 1]
-            self.g[ele][step] = g
+            # if step == 0:
+            #     g = self.g_0[ele]
+            # else:
+            #     g = u_r - u_c + self.g[ele][step - 1]
+            self.g[ele][step + 1] = g_step_1
 
-    def instant_k_c(self, ele, u, step):
+    def instant_k_c(self, ele, step):
         """
         Get instant contact stiffness value
         :param ele: Contact element tag
-        :param u: Nodal displacement to be solved (step + 1)
         :param step: Time step
         :return:
         """
-        node_c = self.c_ele[ele]['node'][0]
-        node_r = self.c_ele[ele]['node'][1]
         mat_tag = self.c_ele[ele]['mat_tag']
         gap_tol = self.mat[mat_tag]['gap_tol']  # Gap tolerance
         k_c1 = self.mat[mat_tag]['k_c1']
         k_c2 = self.mat[mat_tag]['k_c2']
-        u_c = u[(node_c - 1) * 3]
-        u_r = u[(node_r - 1) * 3]
-        g_step = self.g[ele][step]  # Gap at last time step
-        if u_r - u_c + g_step > gap_tol:
+        g_step_1 = self.g[ele][step + 1]  # Trial gap at step + 1
+        if g_step_1 > gap_tol:
             k_c = k_c1
         else:
             k_c = k_c2
         return k_c
 
-    def instant_c_c(self, ele, u, step):
+    def instant_c_c(self, ele, step):
         """
         Get instant contact damping coefficient
         :param ele: Contact element tag
-        :param u: Nodal displacement to be solved (step + 1)
         :param step: Time step
         :return:
         """
-        node_c = self.c_ele[ele]['node'][0]
-        node_r = self.c_ele[ele]['node'][1]
+        # node_c = self.c_ele[ele]['node'][0]
+        # node_r = self.c_ele[ele]['node'][1]
         mat_tag = self.c_ele[ele]['mat_tag']
         gap_tol = self.mat[mat_tag]['gap_tol']
         c_c1 = self.mat[mat_tag]['c_c1']
         c_c2 = self.mat[mat_tag]['c_c2']
-        u_c = u[(node_c - 1) * 3]
-        u_r = u[(node_r - 1) * 3]
-        g_step = self.g[ele][step]  # Gap at last time step
-        if u_r - u_c + g_step > gap_tol:
+        # u_c = u[(node_c - 1) * 3]
+        # u_r = u[(node_r - 1) * 3]
+        # g_step = self.g[ele][step]  # Gap at last time step
+        g_step_1 = self.g[ele][step + 1]  # Trial gap at step + 1
+        if g_step_1 > gap_tol:
             c_c = c_c1
         else:
             c_c = c_c2
         return c_c
 
-    def update_kc(self, u, step):
+    def update_kc(self, step):
         """
         Update instant contact element stiffness matrix
-        :param u: Nodal displacement to be solved (step + 1)
         :param step: Time step
         """
         n_c = np.hstack((np.eye(self.ndf), - np.eye(self.ndf)))
@@ -276,26 +282,24 @@ class Model:
             mat_tag = self.c_ele[ele]['mat_tag']
             mu = self.mat[mat_tag]['mu']
             alpha_c = np.array([[1], [-mu], [0]])
-            k_c = self.instant_k_c(ele, u, step)
+            k_c = self.instant_k_c(ele, step)
             self.kc_ele[ele] = k_c * np.dot(np.dot(np.dot(n_c.T, alpha_c), t_c.T), n_c)
 
-    def update_cc(self, u, step):
+    def update_cc(self, step):
         """
         Update instant contact element damping matrix
-        :param u: Nodal displacement to be solved (step + 1)
         :param step: Time step
         """
         n_c = np.hstack((np.eye(self.ndf), - np.eye(self.ndf)))
         t_c = np.array([[1], [0], [0]])
         for ele in self.c_ele.keys():
-            c_c = self.instant_c_c(ele, u, step)
+            c_c = self.instant_c_c(ele, step)
             beta_c = np.array(([-c_c], [0], [0]))
             self.cc_ele[ele] = np.dot(np.dot(np.dot(n_c.T, beta_c), t_c.T), n_c)
 
-    def update_fc(self, u, step):
+    def update_fc(self, step):
         """
         Update instant contact force
-        :param u: Nodal displacement to be solved (step + 1)
         :param step: Time step
         """
         n_c = np.hstack((np.eye(self.ndf), - np.eye(self.ndf)))
@@ -303,9 +307,10 @@ class Model:
             mat_tag = self.c_ele[ele]['mat_tag']
             mu = self.mat[mat_tag]['mu']
             alpha_c = np.array([[1], [-mu], [0]])
-            k_c = self.instant_k_c(ele, u, step)
-            g_step = self.g[ele][step]
-            self.fc_ele[ele] = k_c * np.dot(n_c.T, alpha_c) * g_step
+            k_c = self.instant_k_c(ele, step)
+            # g_step = self.g[ele][step]
+            g_0 = self.g[ele][0]
+            self.fc_ele[ele] = k_c * np.dot(n_c.T, alpha_c) * g_0
 
     def fix(self, node_tag, *cstrts):
         """
