@@ -238,6 +238,17 @@ class TRBDF2:
             if l > self.num_iter:
                 raise RuntimeError('Newton-Raphson iterations did not converge at the second sub-step!')
 
+    def get_init_fc(self):
+        """
+        Get Initial contact force
+        :return: Initial contact force
+        """
+        self.model.init_g()
+        self.model.update_g(self.model.u[:, 0], 0)  # Update gap
+        self.model.update_fc(step=0)  # Assemble nodal contact force vector
+        self.model.assemble_fc()  # Assemble nodal contact force vector
+        return self.model.fc[self.dof]
+
     def solve_contact(self):
         """
         Solve contact equation
@@ -250,7 +261,8 @@ class TRBDF2:
         cc = self.model.cc[self.dof_i, self.dof_j]  # Contact damping matrix
         c = self.model.alpha_m * m + self.model.beta_k * k + cc  # Damping matrix
         a_g = self.model.a_g[self.dof, :]  # Ground motion accelerations at nodes
-        f = -np.dot(m, a_g) + self.model.f[self.dof, :]  # known equivalent nodal forces
+        fc_0 = self.get_init_fc()  # Initial contact force
+        f = -np.dot(m, a_g) + fc_0 + self.model.f[self.dof, :]  # known equivalent nodal forces
         u_tt[:, 0] = np.dot(np.linalg.inv(m), f[:, 0] - np.dot(c, u_t[:, 0]) - np.dot(k, u[:, 0]))
         self.model.init_g()  # Initial gap
         for step in range(self.model.accel_len - 1):
