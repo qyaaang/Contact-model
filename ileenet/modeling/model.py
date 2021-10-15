@@ -393,7 +393,6 @@ class Model:
         """
         num_dof = self.get_num_dof()
         self.cc = np.zeros((num_dof, num_dof))  # Global damping matrix
-        self.contact_damping()
         for ele in self.cc_ele.keys():
             node_c, node_r = self.c_ele[ele]['node'][0], self.c_ele[ele]['node'][1]
             ele_dof_c = [[3 * node_c - 3], [3 * node_c - 2], [3 * node_c - 1],
