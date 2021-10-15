@@ -46,6 +46,29 @@ class ModifiedNewton:
         k_0_hat = c_0 * m + c_1 * c + k + kc  # Instant equivalent stiffness matrix
         return k_0_hat
 
+    def get_init_k_damping(self, model, c_0, c_1, step, m, c, k):
+        """
+        Get initial stiffness matrix (Nonlinear damping)
+        :param model: Model
+        :param c_0: Parameter 1
+        :param c_1: Parameter 2
+        :param step: Current step
+        :param m: Mass matrix
+        :param c: Damping matrix
+        :param k: Stiffness matrix
+        :return: Initial stiffness matrix
+        """
+        u_trial = model.u[:, step]  # Initial trial displacement
+        model.update_g(u_trial, step)  # Update gap
+        model.update_kc(step)  # Update contact element stiffness matrix
+        model.assemble_kc()  # Assemble contact stiffness matrix
+        model.update_cc(step)  # Update contact damping matrix
+        model.assemble_cc()  # Assemble contact damping matrix
+        kc = model.kc[model.active_dof_i, model.active_dof_j]  # Instant global contact stiffness matrix
+        cc = model.cc[model.active_dof_i, model.active_dof_j]  # Instant global contact damping matrix
+        k_0_hat = c_0 * m + c_1 * (c + cc) + k + kc  # Instant equivalent stiffness matrix
+        return k_0_hat
+
     def solve_current_step(self, u_trial, k_0, f):
         """
         Slove current step for non-contact problem
