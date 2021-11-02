@@ -21,9 +21,14 @@ class EnergyLoss:
         self.contact_time = {}
         self.dof_i, self.dof_j, self.dof = self.model.active_dof_i, self.model.active_dof_j, self.model.active_dof
 
-    def get_contact_time(self):
+    def __call__(self, *args, **kwargs):
+        self.get_contact_time_idx()
+        energy_loss = self.contact_energy_loss()
+        return energy_loss
+
+    def get_contact_time_idx(self):
         """
-        Get contact time
+        Get contact time index
         """
         for ele in self.model.g.keys():
             gap = self.model.g[ele]  # Gap history of contact element
