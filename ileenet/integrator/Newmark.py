@@ -131,7 +131,7 @@ class Newmark:
             self.model.assemble_fc()  # Assemble nodal contact force vector
             kc = self.model.kc[self.dof_i, self.dof_j]  # Instant global contact stiffness matrix
             cc = self.model.cc[self.dof_i, self.dof_j]  # Instant global contact damping matrix
-            print(kc[0, 0], cc[0, 0])
+            # print(kc[0, 0], cc[0, 0])
             fc = self.model.fc[self.dof] + \
                 np.dot(cc, self.a_1 * u_step.reshape(-1, 1) +
                        self.a_4 * u_t_step.reshape(-1, 1) +
@@ -166,7 +166,7 @@ class Newmark:
         u_tt[:, 0] = np.dot(np.linalg.inv(m), f[:, 0] - np.dot(c, u_t[:, 0]) - np.dot(k, u[:, 0]))
         self.model.init_g()  # Initial gap
         for step in range(self.model.accel_len - 1):
-            print(step)
+            # print(step)
             f_hat = f[:, step + 1] + \
                 np.dot(m, self.a_0 * u[:, step] + self.a_2 * u_t[:, step] + self.a_3 * u_tt[:, step]) + \
                 np.dot(c, self.a_1 * u[:, step] + self.a_4 * u_t[:, step] + self.a_5 * u_tt[:, step])
