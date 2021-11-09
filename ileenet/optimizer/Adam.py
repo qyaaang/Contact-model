@@ -36,4 +36,4 @@ class Adam:
         r_hat = r / (1 - np.power(self.betas[1], t + 1))  # Bias-corrected second raw moment estimate
         delta_param = np.multiply(s_hat, 1 / (np.sqrt(r_hat) + 1e-8))
         params -= np.multiply(self.lr, delta_param)
-        return params
+        return params, s, r
