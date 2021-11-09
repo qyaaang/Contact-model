@@ -27,4 +27,4 @@ class SGD:
         """
         v = self.momentum * v - self.lr * grads
         params += v
-        return params
+        return params, v
