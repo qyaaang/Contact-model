@@ -125,18 +125,22 @@ class EnergyLoss:
         energy_loss = 0.
         for ele in self.contact_time.keys():
             for contact_idx in self.contact_time[ele].keys():
-                time_idx_1 = self.contact_time[ele][contact_idx][0]
-                time_idx_2 = self.contact_time[ele][contact_idx][1]
-                v_1, v_2 = self.get_contact_velocity(time_idx_1, time_idx_2)
-                u_1, u_2 = self.get_contact_disp(time_idx_1, time_idx_2)
-                e_k1 = self.kinetic_energy(v_1)  # Kinetic energy before contact
-                e_k2 = self.kinetic_energy(v_2)  # Kinetic energy after contact
-                e_e1 = self.elastic_energy(u_1)  # Elastic energy before contact
-                e_e2 = self.elastic_energy(u_2)  # Elastic energy after contact
-                delta_e_m = (e_k2 + e_e2) - (e_k1 + e_e1)  # Change in mechanic energy
-                e_i = self.inertia_energy(time_idx_1, time_idx_2)  # Inertia energy
-                e_d = self.damping_energy(time_idx_1, time_idx_2)  # Damping energy
-                e_c = delta_e_m - e_i - e_d  # Energy loss due to contact
+                try:
+                    time_idx_1 = self.contact_time[ele][contact_idx][0]
+                    time_idx_2 = self.contact_time[ele][contact_idx][1]
+                    v_1, v_2 = self.get_contact_velocity(time_idx_1, time_idx_2)
+                    u_1, u_2 = self.get_contact_disp(time_idx_1, time_idx_2)
+                    e_k1 = self.kinetic_energy(v_1)  # Kinetic energy before contact
+                    e_k2 = self.kinetic_energy(v_2)  # Kinetic energy after contact
+                    e_e1 = self.elastic_energy(u_1)  # Elastic energy before contact
+                    e_e2 = self.elastic_energy(u_2)  # Elastic energy after contact
+                    delta_e_m = (e_k2 + e_e2) - (e_k1 + e_e1)  # Change in mechanic energy
+                    e_i = self.inertia_energy(time_idx_1, time_idx_2)  # Inertia energy
+                    e_d = self.damping_energy(time_idx_1, time_idx_2)  # Damping energy
+                    e_c = delta_e_m - e_i - e_d  # Energy loss due to contact
+                except:
+                    e_c = 0
                 energy_loss += e_c
                 # print(delta_e_m, e_i, e_d, e_c)
+        # print(energy_loss)
         return energy_loss
