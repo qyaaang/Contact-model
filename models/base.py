@@ -27,9 +27,9 @@ class BaseModel:
         self.dt = 0.  # Time interval
         self.scale = 0  # Scale
 
-    def __call__(self, gm_data, params):
+    def __call__(self, gm_data, fs, scale, params):
         self.register_params(params)
-        self.register_gm_data(gm_data)
+        self.register_gm_data(gm_data, fs, scale)
         return self.forward()
 
     def register_params(self, params):
@@ -39,7 +39,7 @@ class BaseModel:
         """
         self.params = np.array(params)
 
-    def register_gm_data(self, gm_data, fs=256, scale=9800):
+    def register_gm_data(self, gm_data, fs=200, scale=9800):
         """
         Register ground motion data
         :param gm_data: Ground motion data
