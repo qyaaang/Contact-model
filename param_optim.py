@@ -16,8 +16,7 @@ from ileenet.objective.EnergyLoss import EnergyLoss
 from ileenet.optimizer.SGD import SGD
 from ileenet.optimizer.Adam import Adam
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib
+from scipy.optimize import minimize, Bounds
 import argparse
 import json
 import copy
@@ -26,32 +25,52 @@ import time
 
 class ParamExp:
 
-    def __init__(self, args):
+    def __init__(self, gm, args):
+        self.gm = gm  # Ground motion
         self.args = args  # Initial parameters
-        self.model = BaseModel(args)
+        self.model = BaseModel(args)  # Model
 
-    def model_output(self, gm, params):
-        return self.model(gm, params)
+    def energy_loss(self, params):
+        output = self.model(self.gm['Data'], self.gm['Fs'], self.gm['Scale'], params)
+        criteria = EnergyLoss(output)
+        energy_loss = criteria()
+        return energy_loss
 
-    def energy_loss(self, gm, params):
-        output = self.model(gm, params)
+    def search_params(self, params):
+        bounds = Bounds([self.args.hw_lb, self.args.hc_lb, self.args.g_lb, self.args.rk_lb,
+                         self.args.rc_lb, self.args.mu_lb],
+                        [self.args.hw_rb, self.args.hc_rb, self.args.g_rb, self.args.rk_rb,
+                         self.args.rc_rb, self.args.mu_rb])
+        t1 = time.time()
+        params_optim = minimize(self.energy_loss, params, method='SLSQP', jac='2-point',
+                                options={'ftol': 1e-9, 'disp': True}, bounds=bounds)
+        t2 = time.time()
+        print('Time cost: {:.2f}s'.format(t2 - t1))
+        np.save('./results/optim_params_{}_{}_{}_{}_{}_{}_{}.npy'.
+                format(self.args.gm, self.args.h_w, self.args.h_c, self.args.g,
+                       self.args.r_k, self.args.r_c, self.args.mu), params_optim.x)
+        print(params_optim)
+        return params_optim
+
+    def energy_loss_(self, params):
+        output = self.model(self.gm['Data'], self.gm['Fs'], self.gm['Scale'], params)
         criteria = EnergyLoss(output)
         energy_loss = criteria()
         return energy_loss, output
 
-    def gradient(self, gm, params, lambdas):
+    def gradient_lagrangian(self, params, lambdas, h=0.1):
         grads = np.zeros_like(params)
-        h = np.array([10, 10, 0.1, 1, 1, 0.00001])
+        # h = np.array([10, 10, 0.1, 1, 1, 0.00001])
         for idx in range(len(params)):
             # print('Param {} computing gradient...'.format(idx + 1))
             # print(idx)
             param_tmp = copy.deepcopy(params)
             a = param_tmp[idx]
-            param_tmp[idx] = a + h[idx]
-            loss1, _ = self.energy_loss(gm, param_tmp)
-            param_tmp[idx] = a - h[idx]
-            loss2, _ = self.energy_loss(gm, param_tmp)
-            grads[idx] = (loss1 - loss2) / (2 * h[idx]) + lambdas[2 * idx] - lambdas[2 * idx + 1]
+            param_tmp[idx] = a + h
+            loss1, _ = self.energy_loss_(param_tmp)
+            param_tmp[idx] = a - h
+            loss2, _ = self.energy_loss_(param_tmp)
+            grads[idx] = (loss1 - loss2) / (2 * h) + lambdas[2 * idx] - lambdas[2 * idx + 1]
         return grads
 
     def gradient_lambda(self, params):
@@ -65,7 +84,7 @@ class ParamExp:
             grads_lambda[2 * idx + 1] = - param + bounds[2 * idx]
         return grads_lambda
 
-    def update_param(self, gm, params, lambdas):
+    def update_param(self, params, lambdas):
         # optimizer = SGD(params, lr=self.args.lr, momentum=self.args.momentum)
         # lr = np.array([1e-3, 1e-3, 1e-7, 1e-6, 1e-6, 1e-6])
         # lr_lambda = np.array([1e-3, 1e-3, 1e-3, 1e-3, 1e-7, 1e-7, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6])
@@ -86,7 +105,7 @@ class ParamExp:
                 grads_lambda = self.gradient_lambda(params)
                 lambdas += np.multiply(self.args.lr, grads_lambda)
             print('Lambda: {}'.format(lambdas))
-            grads = self.gradient(gm, params, lambdas)
+            grads = self.gradient_lagrangian(params, lambdas)
             grad_norm = np.linalg.norm(grads, ord=2)
             print('Grads: {}'.format(grads))
             print('Grad norm: {:.2f}'.format(grad_norm))
@@ -96,8 +115,8 @@ class ParamExp:
                 params, s, r = optimizer.step(params, grads, s, r, epoch + 1)
             print('\033[1;34mh_w: {:.6f} h_c:{:.6f} g:{:.6f} r_k: {:.6f} r_c: {:.6f} mu :{:.6f}\033[0m'.
                   format(params[0], params[1], params[2], params[3], params[4], params[5]))
-            energy_loss, output = self.energy_loss(gm, params)
-            # self.show_accel(output)
+            energy_loss, output = self.energy_loss_(params)
+            # np.save('./results/outputs/{}_{}.npy'.format(self.args.test, epoch + 1), output.u_tt)
             for idx, param_name in enumerate(param_names):
                 optim_history[epoch + 1][param_name] = params[idx]
             optim_history[epoch + 1]['Energy loss'] = energy_loss
@@ -109,20 +128,10 @@ class ParamExp:
             if grad_norm <= self.args.grad_tol:
                 break
         optim_history = json.dumps(optim_history, indent=2)
-        with open('./results/optim history_{}.json'.format(self.args.optimizer), 'w') as f:
+        with open('./results/optim history_{}_{}_{}_{}.json'.
+                  format(self.args.gm, self.args.optimizer, self.args.lr, self.args.num_epoch), 'w') as f:
             f.write(optim_history)
         return params
-
-    def show_accel(self, mdl_output):
-        matplotlib.rcParams['text.usetex'] = True
-        fig, ax = plt.subplots(figsize=(10, 3))
-        ax.plot(np.arange(0, mdl_output.accel_len) / 256, mdl_output.u_tt[3, :] / 9800, ls='-', c='b', label='Wall')
-        ax.plot(np.arange(0, mdl_output.accel_len) / 256, mdl_output.u_tt[9, :] / 9800, ls='--', c='r', label='Frame')
-        ax.set_xlabel(r'$t$')
-        ax.set_ylabel(r'$\ddot{u}$')
-        plt.tight_layout()
-        plt.show()
-        plt.close()
 
 
 if __name__ == '__main__':
@@ -133,7 +142,7 @@ if __name__ == '__main__':
     parser.add_argument('--g', default=1, type=float)  # Gap
     parser.add_argument('--r_k', default=1000, type=float)  # Ratio of stiffness after contact to before
     parser.add_argument('--r_c', default=1000, type=float)  # Ratio of damping coefficient after contact to before
-    parser.add_argument('--mu', default=0.15, type=float)  # Friction coefficient
+    parser.add_argument('--mu', default=0.1, type=float)  # Friction coefficient
     # Fixed parameters
     parser.add_argument('--k_c1', default=10, type=float)  # Stiffness before contact
     parser.add_argument('--c_c1', default=0.001, type=float)  # Damping coefficient before contact
@@ -149,15 +158,17 @@ if __name__ == '__main__':
     parser.add_argument('--rou', default=2.5e-9, type=int)  # Density of material
     parser.add_argument('--e', default=3e4, type=int)  # Young's elasticity modulus of material
     # Analysis hyper-parameters
-    parser.add_argument('--test', default='D1a-25%-y', type=str)  # Ground motion
+    parser.add_argument('--gm', default='SLS-25', type=str)  # Ground motion
     parser.add_argument('--gm_dir', default='1', type=str)  # Ground motion direction
+    parser.add_argument('--fs', default=200, type=float)  # Sampling frequency
+    parser.add_argument('--scale', default=9800, type=float)  # Scale factor
     parser.add_argument('--integrator', default='Newmark', type=str)  # Integrator
     parser.add_argument('--algo', default='modified_newton', type=str)  # Iteration algorithm
     parser.add_argument('--convergence', default='disp', type=str)  # Convergence criteria
     parser.add_argument('--tol', default=1e-8, type=float)  # Convergence tolerance
     parser.add_argument('--max_iter', default=200, type=int)  # Maximum number of iterations
     # Optimize hyper-parameters
-    parser.add_argument('--optimizer', default='Adam', type=str)  # Optimizer
+    parser.add_argument('--optimizer', default='SGD', type=str)  # Optimizer
     parser.add_argument('--grad_tol', default=1e-8, type=float)  # Gradient norm tolerance
     parser.add_argument('--lr', default=1e-8, type=float)  # Learning rate
     parser.add_argument('--momentum', default=0.9, type=float)  # Momentum
@@ -170,7 +181,7 @@ if __name__ == '__main__':
     parser.add_argument('--hc_lb', default=200, type=float)
     parser.add_argument('--hc_rb', default=700, type=float)
     parser.add_argument('--g_lb', default=0.5, type=float)
-    parser.add_argument('--g_rb', default=1.5, type=float)
+    parser.add_argument('--g_rb', default=10, type=float)
     parser.add_argument('--rk_lb', default=700, type=float)
     parser.add_argument('--rk_rb', default=1500, type=float)
     parser.add_argument('--rc_lb', default=700, type=float)
@@ -178,8 +189,10 @@ if __name__ == '__main__':
     parser.add_argument('--mu_lb', default=0.1, type=float)
     parser.add_argument('--mu_rb', default=0.5, type=float)
     args = parser.parse_args()
-    exp = ParamExp(args)
-    gm_data = np.load('./data/{}.npy'.format(args.test))
-    params = np.array([args.h_w, args.h_c, args.g, args.r_k, args.r_c, args.mu])
-    lambdas = np.array([-1e4, 1e4, -1e4, 1e4, -1e5, 1e5, -1e4, 1e4, -1e4, 1e4, -1e3, 1e3])
-    params = exp.update_param(gm_data, params, lambdas)
+    gm_data = np.load('./data/{}.npy'.format(args.gm))
+    gm = {'Data': gm_data, 'Fs': args.fs, 'Scale': args.scale}
+    exp = ParamExp(gm, args)
+    params = np.array([args.h_w, args.h_c, args.g, args.r_k, args.r_c, args.mu])  # Initial parameters
+    # lambdas = np.array([1e4, 1e4, 1e4, 1e4, 1e5, 1e5, 1e4, 1e4, 1e4, 1e4, 1e3, 1e3])
+    # params = exp.update_param(params, lambdas)
+    params_optim = exp.search_params(params)
