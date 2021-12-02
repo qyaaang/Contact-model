@@ -69,7 +69,7 @@ class BaseModel:
         model.node(3, self.params[2], 0)
         model.node(4, self.params[2], self.args.h)
         m_w = self.args.rou * self.params[0] * self.args.b_w * self.args.h  # Lumped mass of wall
-        m_c = self.args.rou * self.params[1] * self.args.h_c * self.args.h  # Lumped mass of column
+        m_c = self.args.rou * self.params[1] * self.params[1] * self.args.h  # Lumped mass of column
         f_p = self.args.alpha * self.args.f_y * (np.pi * self.args.d ** 2 / 4)  # PT force
         m_p = f_p / 9800  # Equivalent mass due to PT
         m_w_all = m_w + m_p
@@ -91,7 +91,7 @@ class BaseModel:
         model.contact_element(3, 4, 2, 1)
         model.fix(1, 1, 1, 1)
         model.fix(3, 1, 1, 1)
-        model.load(1, 0, -f_p, 0)
+        model.load(2, 0, -f_p, 0)
         return model
 
     def forward(self):
