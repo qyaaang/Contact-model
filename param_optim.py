@@ -46,7 +46,7 @@ class ParamExp:
                                 options={'ftol': 1e-9, 'disp': True}, bounds=bounds)
         t2 = time.time()
         print('Time cost: {:.2f}s'.format(t2 - t1))
-        np.save('./results/optim_params_{}_{}_{}_{}_{}_{}_{}.npy'.
+        np.save('./results/optim/optim_params_{}_{}_{}_{}_{}_{}_{}.npy'.
                 format(self.args.gm, self.args.h_w, self.args.h_c, self.args.g,
                        self.args.r_k, self.args.r_c, self.args.mu), params_optim.x)
         print(params_optim)
@@ -128,7 +128,7 @@ class ParamExp:
             if grad_norm <= self.args.grad_tol:
                 break
         optim_history = json.dumps(optim_history, indent=2)
-        with open('./results/optim history_{}_{}_{}_{}.json'.
+        with open('./results/optim/optim history_{}_{}_{}_{}.json'.
                   format(self.args.gm, self.args.optimizer, self.args.lr, self.args.num_epoch), 'w') as f:
             f.write(optim_history)
         return params
@@ -151,14 +151,15 @@ if __name__ == '__main__':
     parser.add_argument('--b_w', default=150, type=float)  # Width of wall section
     parser.add_argument('--h', default=3000, type=float)  # Story height
     parser.add_argument('--mb', default=3.545, type=float)  # Mass block
-    parser.add_argument('--alpha', default=0.9, type=float)  # PT coefficient
-    parser.add_argument('--f_y', default=1137, type=float)  # Yield strength of PT bar
+    parser.add_argument('--alpha', default=1.0, type=float)  # PT coefficient
+    parser.add_argument('--f_y', default=451, type=float)  # Yield strength of PT bar
     parser.add_argument('--d', default=32, type=float)  # Diameter of PT bar
     parser.add_argument('--num_bar', default=2, type=int)  # Number of PT bars
     parser.add_argument('--rou', default=2.5e-9, type=int)  # Density of material
     parser.add_argument('--e', default=3e4, type=int)  # Young's elasticity modulus of material
     # Analysis hyper-parameters
     parser.add_argument('--gm', default='SLS-25', type=str)  # Ground motion
+    parser.add_argument('--dataset', default='PEER', type=str, help='PEER, test')  # Ground motion dataset
     parser.add_argument('--gm_dir', default='1', type=str)  # Ground motion direction
     parser.add_argument('--fs', default=200, type=float)  # Sampling frequency
     parser.add_argument('--scale', default=9800, type=float)  # Scale factor
@@ -189,7 +190,7 @@ if __name__ == '__main__':
     parser.add_argument('--mu_lb', default=0.1, type=float)
     parser.add_argument('--mu_rb', default=0.5, type=float)
     args = parser.parse_args()
-    gm_data = np.load('./data/{}.npy'.format(args.gm))
+    gm_data = np.load('./data/ground motion/{}/{}.npy'.format(args.dataset, args.gm))
     gm = {'Data': gm_data, 'Fs': args.fs, 'Scale': args.scale}
     exp = ParamExp(gm, args)
     params = np.array([args.h_w, args.h_c, args.g, args.r_k, args.r_c, args.mu])  # Initial parameters
