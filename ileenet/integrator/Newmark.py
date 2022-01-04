@@ -62,6 +62,9 @@ class Newmark:
         if tag == 'modified_newton':
             from ileenet.algorithm.ModifiedNewton import ModifiedNewton
             self.algo = ModifiedNewton(prob_tag)
+        if tag == 'momentum_newton':
+            from ileenet.algorithm.MomentumNewton import MomentumNewton
+            self.algo = MomentumNewton(prob_tag)
 
     def test(self, tag, tol, num_iter):
         """
@@ -120,6 +123,7 @@ class Newmark:
         """
         l = 0  # Iteration step
         u_trial = self.model.u[:, step] + 0.  # Initial trial displacement
+        k_lib = {}
         while True:
             l += 1
             self.model.update_g(u_trial, step)  # Update gap
@@ -138,6 +142,15 @@ class Newmark:
                        self.a_5 * u_tt_step.reshape(-1, 1))  # Instant contact force vector and damping force
             if self.algo_tag == 'newton':
                 k_hat = self.a_0 * m + self.a_1 * (c + cc) + k + kc  # Instant equivalent stiffness matrix
+            elif self.algo_tag == 'momentum_newton':
+                if l == 1:
+                    k_hat = self.a_0 * m + self.a_1 * (c + cc) + k + kc
+                    k_lib[l] = k_hat
+                else:
+                    # k_last = k_lib[l - 1]
+                    k_current = self.a_0 * m + self.a_1 * (c + cc) + k + kc
+                    # k_lib[l] = k_current
+                    k_hat = 0.9 * k_lib[1] + 0.1 * k_current
             else:
                 # Initial equivalent stiffness matrix
                 k_hat = self.algo.get_init_k_damping(self.model, self.a_0, self.a_1, step, m, c, k)
