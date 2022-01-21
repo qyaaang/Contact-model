@@ -24,12 +24,10 @@ class BaseModel:
         self.args = args
         self.params = None  # Parameters
         self.gm_data = None  # Ground motion data
-        self.dt = 0.  # Time interval
-        self.scale = 0  # Scale
 
-    def __call__(self, gm_data, fs, scale, params):
+    def __call__(self, gm_data, params):
+        self.register_gm_data(gm_data)
         self.register_params(params)
-        self.register_gm_data(gm_data, fs, scale)
         return self.forward()
 
     def register_params(self, params):
@@ -39,16 +37,12 @@ class BaseModel:
         """
         self.params = np.array(params)
 
-    def register_gm_data(self, gm_data, fs=200, scale=9800):
+    def register_gm_data(self, gm_data):
         """
         Register ground motion data
         :param gm_data: Ground motion data
-        :param fs: Sampling frequency
-        :param scale: Scale
         """
         self.gm_data = gm_data
-        self.dt = 1 / fs
-        self.scale = scale
 
     def init_model(self):
         """
@@ -66,26 +60,27 @@ class BaseModel:
         model.mdl(2, 3)
         model.node(1, 0, 0)
         model.node(2, 0, self.args.h)
-        model.node(3, self.params[2], 0)
-        model.node(4, self.params[2], self.args.h)
-        m_w = self.args.rou * self.params[0] * self.args.b_w * self.args.h  # Lumped mass of wall
-        m_c = self.args.rou * self.params[1] * self.params[1] * self.args.h  # Lumped mass of column
-        f_p = self.args.alpha * self.args.f_y * (np.pi * self.args.d ** 2 / 4)  # PT force
+        model.node(3, self.params[0], 0)
+        model.node(4, self.params[0], self.args.h)
+        m_w = self.args.rou * self.args.h_w * self.args.b_w * self.args.h  # Lumped mass of wall
+        m_c = self.args.rou * self.args.h_c * self.args.h_c * self.args.h  # Lumped mass of column
+        f_p = self.args.alpha * self.args.f_y * (np.pi * self.args.d ** 2 / 4) * self.args.num_bar  # PT force
         m_p = f_p / 9800  # Equivalent mass due to PT
         m_w_all = m_w + m_p
         m_c_all = m_c + self.args.mb
+        # print(m_c_all / m_w)
         model.mass(1, 0.5 * m_w_all, 0.5 * m_w_all, 0.5 * m_w_all)
         model.mass(2, 0.5 * m_w_all, 0.5 * m_w_all, 0.5 * m_w_all)
         model.mass(3, 0.5 * m_c_all, 0.5 * m_c_all, 0.5 * m_c_all)
         model.mass(4, 0.5 * m_c_all, 0.5 * m_c_all, 0.5 * m_c_all)
-        a_w = self.params[0] * self.args.b_w
-        i_w = (self.args.b_w * self.params[0] ** 3) / 12
-        a_c = self.params[1] * self.params[1]
-        i_c = (self.params[1] * self.params[1] ** 3) / 12
-        model.hertz_contact_2(1, self.params[2],
-                              self.args.k_c1, self.params[3] * self.args.k_c1,
-                              self.args.c_c1, self.params[4] * self.args.c_c1,
-                              self.params[5], self.args.g_tol)
+        a_w = self.args.h_w * self.args.b_w
+        i_w = (self.args.b_w * self.args.h_w ** 3) / 12
+        a_c = self.args.h_c * self.args.h_c
+        i_c = (self.args.h_c * self.args.h_c ** 3) / 12
+        model.hertz_contact_2(1, self.params[0],
+                              self.args.k_c1, self.params[1] * self.args.k_c1,
+                              self.args.c_c1, self.params[2] * self.args.c_c1,
+                              self.params[3], self.args.g_tol)
         model.beam_element(1, 1, 2, a_w, self.args.e, 0.5 * i_w)
         model.beam_element(2, 3, 4, a_c, self.args.e, 0.5 * i_c)
         model.contact_element(3, 4, 2, 1)
@@ -100,7 +95,7 @@ class BaseModel:
         :return: solved model
         """
         model = self.init_model()
-        model.ground_motion(int(self.args.gm_dir), self.gm_data, self.dt, self.scale)
+        model.ground_motion(int(self.args.gm_dir), self.gm_data, 1 / self.args.fs, self.args.factor)
         model.analysis('transient')
         model.system()
         mode = IMI(model)
