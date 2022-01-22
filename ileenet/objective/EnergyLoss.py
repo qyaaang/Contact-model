@@ -138,6 +138,8 @@ class EnergyLoss:
                     e_i = self.inertia_energy(time_idx_1, time_idx_2)  # Inertia energy
                     e_d = self.damping_energy(time_idx_1, time_idx_2)  # Damping energy
                     e_c = delta_e_m - e_i - e_d  # Energy loss due to contact
+                    if e_c > 0:
+                        e_c = 0
                 except:
                     e_c = 0
                 energy_loss += e_c
