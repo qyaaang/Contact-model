@@ -72,7 +72,7 @@ class ParamStudy:
                   format(int(idx) + 1, prob, z, energy, t_1 - t_0))
         result = {'z': zs, 'Probability': probs, 'Energy': energies}
         result = json.dumps(result, indent=2)
-        with open('./results/Parametric study/{}_{:.2f}_{}_{}_{}_{}.json'.
+        with open('./results/Parametric study/Mass ratio/{}_{:.2f}_{}_{}_{}_{}.json'.
                   format(self.args.hazard, f_ratio,
                          self.args.g, self.args.r_k, self.args.r_c, self.args.mu), 'w') as f:
             f.write(result)
