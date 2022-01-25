@@ -81,8 +81,8 @@ class BaseModel:
                               self.args.k_c1, self.params[1] * self.args.k_c1,
                               self.args.c_c1, self.params[2] * self.args.c_c1,
                               self.params[3], self.args.g_tol)
-        model.beam_element(1, 1, 2, a_w, self.args.e, 0.5 * i_w)
-        model.beam_element(2, 3, 4, a_c, self.args.e, 0.5 * i_c)
+        model.beam_element(1, 1, 2, a_w, self.args.e, self.args.rot * i_w)
+        model.beam_element(2, 3, 4, a_c, self.args.e, self.args.rot * i_c)
         model.contact_element(3, 4, 2, 1)
         model.fix(1, 1, 1, 1)
         model.fix(3, 1, 1, 1)
