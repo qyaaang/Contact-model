@@ -44,9 +44,9 @@ class ParamStudy:
         output = self.model(gm, params)
         criteria = Probability(output)
         if self.args.hazard == 'SLE':
-            prob = criteria('acc', self.args.dof_tag, self.args.factor, self.args.a_thresh)
+            prob = criteria('acc', self.args.dof_tag, self.args.factor, self.args.a_thresh, self.args.beta)
         else:
-            prob = criteria('drift', self.args.dof_tag, self.args.h, self.args.d_thresh)
+            prob = criteria('drift', self.args.dof_tag, self.args.h, self.args.d_thresh, self.args.beta)
         return prob, criteria.z
 
     def energy_loss(self, gm, params):
@@ -76,18 +76,19 @@ class ParamStudy:
                   format(self.args.hazard, f_ratio,
                          self.args.g, self.args.r_k, self.args.r_c, self.args.mu), 'w') as f:
             f.write(result)
-        print(np.mean(np.array(probs)))
+        print('Failure probability:{:2f}\tMean energy loss:{:2f}'.
+              format(np.mean(np.array(probs)), np.mean(np.array(energies))))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # Initial parameters to be tuned
     parser.add_argument('--mb', default=15, type=float)  # Mass block
+    # Fixed parameters
     parser.add_argument('--g', default=1., type=float)  # Gap
     parser.add_argument('--r_k', default=1000, type=float)  # Ratio of stiffness after contact to before
     parser.add_argument('--r_c', default=1000, type=float)  # Ratio of damping coefficient after contact to before
     parser.add_argument('--mu', default=0.1, type=float)  # Friction coefficient
-    # Fixed parameters
     parser.add_argument('--h_w', default=1500, type=float)  # Height of wall section
     parser.add_argument('--h_c', default=800, type=float)  # Height of column section
     parser.add_argument('--k_c1', default=10, type=float)  # Stiffness before contact
@@ -102,6 +103,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_bar', default=1, type=int)  # Number of PT bars
     parser.add_argument('--rou', default=2.5e-9, type=int)  # Density of material
     parser.add_argument('--e', default=3e4, type=int)  # Young's elasticity modulus of material
+    parser.add_argument('--rot', default=0.5, type=float)  # Rotation coefficient
     # Analysis hyper-parameters
     parser.add_argument('--hazard', default='SLE', type=str)  # Ground motion
     parser.add_argument('--dataset', default='synthetic', type=str,
@@ -117,7 +119,7 @@ if __name__ == '__main__':
     # Criteria hyper-parameters
     parser.add_argument('--dof_tag', default=9, type=int)  # DOF tag
     parser.add_argument('--a_thresh', default=0.3, type=float)  # Threshold acceleration
-    parser.add_argument('--d_thresh', default=0.025, type=float)  # Threshold drift ratio
+    parser.add_argument('--d_thresh', default=3, type=float)  # Threshold drift ratio
     parser.add_argument('--beta', default=0.05, type=float)  # Logarithmic standard deviation
     args = parser.parse_args()
     exp = ParamStudy(args)
