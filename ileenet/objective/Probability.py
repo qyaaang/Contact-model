@@ -28,7 +28,7 @@ class Probability:
         self.register_prq(args[0])
         self.register_dof(args[1])
         self.register_factor(args[2])
-        return self.gaussian_cdf(args[3])
+        return self.gaussian_cdf(args[3], args[4])
 
     def register_prq(self, prq):
         """
@@ -60,7 +60,7 @@ class Probability:
         if self.prq == 'acc':
             self.z = np.max(np.abs(self.model.u_tt[self.dof, :])) / self.factor
         else:
-            self.z = np.max(np.abs(self.model.u[self.dof, :])) / self.factor
+            self.z = np.max(np.abs(self.model.u[self.dof, :])) / self.factor * 100
         # print(self.z)
 
     def gaussian_cdf(self, z_thresh, beta=0.05):
