@@ -68,7 +68,7 @@ class ParamStudy:
             energy = self.energy_loss(gm, params)
             energies.append(energy)
             t_1 = time.time()
-            print('GM:{}\tFailure probability:{:.2f}\tPRQ:{:.5f}\tEnergy loss:{:.2f}\tTime cost:{:.2f}s'.
+            print('GM:{}\tCumulative probability:{:.2f}\tPRQ:{:.5f}\tEnergy loss:{:.2f}\tTime cost:{:.2f}s'.
                   format(int(idx) + 1, prob, z, energy, t_1 - t_0))
         result = {'z': zs, 'Probability': probs, 'Energy': energies}
         result = json.dumps(result, indent=2)
@@ -76,7 +76,7 @@ class ParamStudy:
                   format(self.args.hazard, f_ratio,
                          self.args.g, self.args.r_k, self.args.r_c, self.args.mu), 'w') as f:
             f.write(result)
-        print('Failure probability:{:2f}\tMean energy loss:{:2f}'.
+        print('Probability of failure:{:2f}\tMean energy loss:{:2f}'.
               format(np.mean(np.array(probs)), np.mean(np.array(energies))))
 
 
