@@ -123,5 +123,5 @@ if __name__ == '__main__':
     parser.add_argument('--beta', default=0.05, type=float)  # Logarithmic standard deviation
     args = parser.parse_args()
     exp = ParamStudy(args)
-    params = np.array([args.g, args.r_k, args.r_c, args.mu])  # Initial parameters
+    params = np.array([args.mb, args.g, args.r_k, args.r_c, args.mu])  # Initial parameters
     exp(params)
