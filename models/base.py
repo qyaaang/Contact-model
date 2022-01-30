@@ -60,14 +60,14 @@ class BaseModel:
         model.mdl(2, 3)
         model.node(1, 0, 0)
         model.node(2, 0, self.args.h)
-        model.node(3, self.params[0], 0)
-        model.node(4, self.params[0], self.args.h)
+        model.node(3, self.params[1], 0)
+        model.node(4, self.params[1], self.args.h)
         m_w = self.args.rou * self.args.h_w * self.args.b_w * self.args.h  # Lumped mass of wall
         m_c = self.args.rou * self.args.h_c * self.args.h_c * self.args.h  # Lumped mass of column
         f_p = self.args.alpha * self.args.f_y * (np.pi * self.args.d ** 2 / 4) * self.args.num_bar  # PT force
         m_p = f_p / 9800  # Equivalent mass due to PT
         m_w_all = m_w + m_p
-        m_c_all = m_c + self.args.mb
+        m_c_all = m_c + self.params[0]
         # print(m_c_all / m_w)
         model.mass(1, 0.5 * m_w_all, 0.5 * m_w_all, 0.5 * m_w_all)
         model.mass(2, 0.5 * m_w_all, 0.5 * m_w_all, 0.5 * m_w_all)
@@ -77,10 +77,10 @@ class BaseModel:
         i_w = (self.args.b_w * self.args.h_w ** 3) / 12
         a_c = self.args.h_c * self.args.h_c
         i_c = (self.args.h_c * self.args.h_c ** 3) / 12
-        model.hertz_contact_2(1, self.params[0],
-                              self.args.k_c1, self.params[1] * self.args.k_c1,
-                              self.args.c_c1, self.params[2] * self.args.c_c1,
-                              self.params[3], self.args.g_tol)
+        model.hertz_contact_2(1, self.params[1],
+                              self.args.k_c1, self.params[2] * self.args.k_c1,
+                              self.args.c_c1, self.params[3] * self.args.c_c1,
+                              self.params[4], self.args.g_tol)
         model.beam_element(1, 1, 2, a_w, self.args.e, self.args.rot * i_w)
         model.beam_element(2, 3, 4, a_c, self.args.e, self.args.rot * i_c)
         model.contact_element(3, 4, 2, 1)
