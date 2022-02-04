@@ -70,6 +70,8 @@ class Sobel:
         """
         y = self.get_y(self.m_1)
         var_y = np.var(y)  # Variance of output
+        print(var_y)
+        mean_y = np.mean(y)
         y_1 = y
         y_3 = self.get_y(self.m_2)
         sobel_indices = np.zeros(self.m_1.shape[1])
@@ -78,7 +80,8 @@ class Sobel:
             t_0 = time.time()
             n_j = self.get_n_j(param_idx)
             y_2 = self.get_y(n_j)
-            u_j = np.mean(np.multiply(y_1, y_2 - y_3))
+            # u_j = np.mean(np.multiply(y_1, y_2 - y_3))
+            u_j = np.mean(np.multiply(y_1, y_2)) - np.power(mean_y, 2)
             s_i = u_j / var_y
             sobel_indices[param_idx] = s_i
             t_1 = time.time()
