@@ -16,7 +16,7 @@ import copy
 import time
 
 
-class Sobel:
+class Sobol:
 
     def __init__(self, criteria, param_ranges, n):
         self.criteria = criteria  # Criteria function
@@ -26,7 +26,7 @@ class Sobel:
 
     def __call__(self, *args, **kwargs):
         self.make_sampling_matrix()
-        return self.sobel_index()
+        return self.sobol_index()
 
     def make_sampling_matrix(self):
         """
@@ -63,28 +63,27 @@ class Sobel:
             y[idx] = self.criteria(m[idx, :])
         return y
 
-    def sobel_index(self):
+    def sobol_index(self):
         """
-        Compute Sobel index
-        :return: Sobel index
+        Compute Sobol index
+        :return: Sobol index
         """
         y = self.get_y(self.m_1)
         var_y = np.var(y)  # Variance of output
-        print(var_y)
-        mean_y = np.mean(y)
+        mean_y = np.mean(y)  # Expectation of output
         y_1 = y
         y_3 = self.get_y(self.m_2)
-        sobel_indices = np.zeros(self.m_1.shape[1])
+        sobol_indices = np.zeros(self.m_1.shape[1])
         param_names = list(self.param_ranges.keys())
         for param_idx in range(self.m_1.shape[1]):
             t_0 = time.time()
             n_j = self.get_n_j(param_idx)
             y_2 = self.get_y(n_j)
-            # u_j = np.mean(np.multiply(y_1, y_2 - y_3))
-            u_j = np.mean(np.multiply(y_1, y_2)) - np.power(mean_y, 2)
+            u_j = np.mean(np.multiply(y_1, y_2 - y_3))
+            # u_j = np.mean(np.multiply(y_1, y_2)) - np.power(mean_y, 2)
             s_i = u_j / var_y
-            sobel_indices[param_idx] = s_i
+            sobol_indices[param_idx] = s_i
             t_1 = time.time()
-            print('{}: {:.5f}\tTime cost: {:.2f}'.format(param_names[param_idx], s_i, t_1 - t_0))
+            print('{}: {:.5f}\tTime cost: {:.2f}s'.format(param_names[param_idx], s_i, t_1 - t_0))
         # print(np.sum(sobel_indices))
-        return sobel_indices
+        return sobol_indices
