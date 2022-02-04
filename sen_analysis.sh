@@ -1,9 +1,7 @@
 #!/bin/bash
-num_samples=(100)
-#hazards=("SLE" "MCE")
-hazards=("MCE")
-#criteria=("Probability" "Energy")
-criteria=("Energy")
+num_samples=(20 25)
+hazards=("SLE" "MCE")
+criteria=("Probability" "Energy")
 for num_sample in "${num_samples[@]}"; do
   printf "\033[1;32mNumber of samples:\t%s\n\033[0m" "$num_sample"
   for hazard in "${hazards[@]}"; do
